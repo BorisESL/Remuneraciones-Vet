@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Honorarios Veterinarios</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            .print-area {
+                width: 100% !important;
+                max-width: none !important;
+            }
+            
+            body {
+                font-size: 12pt !important;
+                background-color: white !important;
+            }
+            
+            h1 {
+                font-size: 18pt !important;
+            }
+            
+            h2, h3 {
+                font-size: 14pt !important;
+            }
+            
+            .bg-gray-100, .bg-blue-50, .bg-gray-50 {
+                background-color: white !important;
+            }
+        }
+        
+        /* Estilos para los iconos SVG */
+        .icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+        }
+        
+        .plus-icon, .trash-icon, .edit-icon, .save-icon, .x-icon, .printer-icon {
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+        
+        /* Transiciones suaves para elementos editables */
+        .value-display, .percentage-display {
+            transition: all 0.15s ease;
+        }
+        
+        .procedure-item {
+            transition: background-color 0.2s ease;
+        }
+        
+        .procedure-item:focus-within {
+            background-color: #f0f9ff;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div id="app" class="max-w-6xl mx-auto p-6 bg-white shadow-lg rounded-lg">
+        <!-- El contenido se cargará aquí mediante JavaScript -->
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Estado de la aplicación
+            let state = {
+                selectedDoctor: '',
+                procedures: {},
+                editingProcedure: null,
+                newProcedureName: '',
+                newProcedureValue: '',
+                newProcedurePercentage: '',
+                showAddForm: false,
+                doctors: [
+                    'Dra. Toledo', 'Dra. Larraín', 'Dra. Venegas', 'Dra. Gutiérrez', 
+                    'Dra. Moncada', 'Dra. Rubilar', 'Dra. Vargas', 'Dr. Mansoulet'
+                ],
+                nurses: ['Enf. Antonia', 'Enf. Marcelo'],
+                nurseData: {
+                    'Enf. Antonia': { days: 0, dailyRate: 0 },
+                    'Enf. Marcelo': { days: 0, dailyRate: 0 }
+                },
+                bonuses: {
+                    hospital: 0,
+                    pabellon: 0,
+                    produccion: 0,
+                    insumosMedicamentos: 0,
+                    descuentos: 0
+                },
+                procedureDatabase: {
+                    'Domicilio': { value: 35000, percentage: 100 },
+                    'Radiografía': { value: 5000, percentage: 100 },
+                    'Control domicilio': { value: 0, percentage: 100 },
+                    'Aspirado abdomen': { value: 0, percentage: 100 },
+                    'Anestesia': { value: 30000, percentage: 30 },
+                    'Anestesia inhalatoria': { value: 60000, percentage: 30 },
+                    'Anestesia inhalatoria pequeña': { value: 30000, percentage: 30 },
+                    'Anestesia inhal. fuera horario': { value: 0, percentage: 30 },
+                    'Aplicación microchip': { value: 6000, percentage: 50 },
+                    'Atención parto': { value: 0, percentage: 100 },
+                    'Consultas Diurnas': { value: 18000, percentage: 30 },
+                    'Consultas Diurnas urgencia': { value: 30000, percentage: 30 },
+                    'Consultas eutanasia': { value: 15000, percentage: 100 },
+                    'Consultas con sedación': { value: 20000, percentage: 100 },
+                    'Curación en consulta': { value: 7000, percentage: 100 },
+                    'Control por vacuna': { value: 11000, percentage: 50 },
+                    'Curva Glicemia': { value: 0, percentage: 100 },
+                    'Control': { value: 9000, percentage: 100 },
+                    'Corte uñas': { value: 6000, percentage: 100 },
+                    'Extracción diente': { value: 15000, percentage: 100 },
+                    'Examen orina': { value: 12000, percentage: 100 },
+                    'Extracción cuerpo extraño': { value: 15000, percentage: 100 },
+                    'Lavado vesical': { value: 0, percentage: 100 },
+                    'Limpieza de oído en consulta': { value: 0, percentage: 100 },
+                    'Limpieza oídos c/sed': { value: 25000, percentage: 100 },
+                    'Limpieza dientes': { value: 25000, percentage: 100 },
+                    'Limpieza herida c/sedación': { value: 20000, percentage: 100 },
+                    'Limpieza herida en consulta': { value: 8000, percentage: 100 },
+                    'Proced. con anestesia': { value: 9000, percentage: 100 },
+                    'Punción Abdominal': { value: 0, percentage: 100 },
+                    'Tratam. Otohematoma': { value: 0, percentage: 100 },
+                    'Tratam viscristina': { value: 25000, percentage: 100 },
+                    'Test schimer': { value: 6000, percentage: 100 },
+                    'Tiempo coagulación': { value: 12000, percentage: 100 },
+                    'Toma de muestra': { value: 6000, percentage: 50 },
+                    'Transfusión': { value: 20000, percentage: 100 },
+                    'TEST DE FLUORESCEÍNA': { value: 6000, percentage: 100 },
+                    'Sondaje con sedación': { value: 25000, percentage: 100 },
+                    'Sondaje': { value: 17000, percentage: 100 },
+                    'Ventas MED INYEC CONSULTA': { value: 44000, percentage: 20, removeIVA: true },
+                    'Ecografías 85%': { value: 36575, percentage: 85 },
+                    'Medicamento inyectable': { value: 0, percentage: 20, removeIVA: true }
+                }
+            };
+
+            // Función para renderizar la aplicación
+            function renderApp() {
+                const app = document.getElementById('app');
+                app.innerHTML = `
+                    <div class="no-print mb-6">
+                        <h1 class="text-3xl font-bold text-gray-800 mb-6">Sistema de Honorarios Veterinarios</h1>
+                        
+                        <!-- Selector de Doctor/Enfermero -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Seleccionar Profesional:
+                            </label>
+                            <select
+                                id="doctorSelect"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Seleccione un profesional...</option>
+                                ${state.doctors.map(doctor => `
+                                    <option value="${doctor}" ${state.selectedDoctor === doctor ? 'selected' : ''}>${doctor}</option>
+                                `).join('')}
+                                ${state.nurses.map(nurse => `
+                                    <option value="${nurse}" ${state.selectedDoctor === nurse ? 'selected' : ''}>${nurse}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+
+                        ${state.selectedDoctor && state.nurses.includes(state.selectedDoctor) ? renderNurseForm() : ''}
+                        ${state.selectedDoctor && !state.nurses.includes(state.selectedDoctor) ? renderDoctorForm() : ''}
+
+                        <button
+                            id="printButton"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 mb-6 no-print"
+                        >
+                            <span class="icon printer-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 极 1-2 2h-2"></path>
+                                    <rect x="6" y="14" width="12" height="8"></rect>
+                                </svg>
+                            </span>
+                            Imprimir Liquidación
+                        </button>
+                    </div>
+
+                    <!-- Área de impresión -->
+                    <div class="print-area">
+                        ${state.selectedDoctor ? renderPrintArea() : ''}
+                    </div>
+                `;
+
+                // Añadir event listeners
+                document.getElementById('doctorSelect').addEventListener('change', (e) => {
+                    handleDoctorChange(e.target.value);
+                });
+
+                if (document.getElementById('printButton')) {
+                    document.getElementById('printButton').addEventListener('click', handlePrint);
+                }
+
+                // Añadir event listeners para formularios de enfermeros
+                if (state.selectedDoctor && state.nurses.includes(state.selectedDoctor)) {
+                    const daysInput = document.getElementById('nurseDays');
+                    const rateInput = document.getElementById('nurseRate');
+                    
+                    if (daysInput) {
+                        daysInput.addEventListener('input', (e) => {
+                            updateNurseData('days', parseInt(e.target.value) || 0);
+                        });
+                    }
+                    
+                    if (rateInput) {
+                        rateInput.addEventListener('input', (e) => {
+                            updateNurseData('dailyRate', parseFloat(e.target.value) || 0);
+                        });
+                    }
+                }
+
+                // Añadir event listeners para formularios de doctores
+                if (state.selectedDoctor && !state.nurses.includes(state.selectedDoctor)) {
+                    // Event listener para botón de agregar procedimiento
+                    const addProcedureBtn = document.getElementById('addProcedureBtn');
+                    if (addProcedureBtn) {
+                        addProcedureBtn.addEventListener('click', () => {
+                            state.showAddForm = !state.showAddForm;
+                            renderApp();
+                        });
+                    }
+
+                    // Event listener para formulario de nuevo procedimiento
+                    if (state.showAddForm) {
+                        const saveProcedureBtn = document.getElementById('saveProcedureBtn');
+                        const cancelProcedureBtn = document.getElementById('cancelProcedureBtn');
+                        
+                        if (saveProcedureBtn) {
+                            saveProcedureBtn.addEventListener('click', addNewProcedure);
+                        }
+                        
+                        if (cancelProcedureBtn) {
+                            cancelProcedureBtn.addEventListener('click', () => {
+                                state.showAddForm = false;
+                                renderApp();
+                            });
+                        }
+                        
+                        // Input listeners para el formulario de nuevo procedimiento
+                        document.getElementById('newProcedureName').addEventListener('input', (e) => {
+                            state.newProcedureName = e.target.value;
+                        });
+                        document.getElementById('newProcedureValue').addEventListener('input', (e) => {
+                            state.newProcedureValue = e.target.value;
+                        });
+                        document.getElementById('newProcedurePercentage').addEventListener('input', (e) => {
+                            state.newProcedurePercentage = e.target.value;
+                        });
+                    }
+
+                    // Event listeners para bonos
+                    const bonusInputs = ['hospital', 'pabellon', 'produccion', 'insumosMedicamentos', 'descuentos'];
+                    bonusInputs.forEach(bonus => {
+                        const input = document.getElementById(`bonus-${bonus}`);
+                        if (input) {
+                            input.addEventListener('input', (e) => {
+                                updateBonus(bonus, parseFloat(e.target.value) || 0);
+                            });
+                        }
+                    });
+                    
+                    // Añadir event listeners para los inputs de cantidad de procedimientos
+                    Object.keys(state.procedureDatabase).forEach(procedureName => {
+                        const input = document.getElementById(`qty-${procedureName}`);
+                        if (input) {
+                            input.addEventListener('input', (e) => {
+                                updateProcedureCount(procedureName, e.target.value);
+                            });
+                        }
+                        
+                        // Botones de edición y eliminación
+                        const editBtn = document.getElementById(`edit-btn-${procedureName}`);
+                        const deleteBtn = document.getElementById(`delete-btn-${procedureName}`);
+                        const ivaCheckbox = document.getElementById(`iva-${procedureName}`);
+                        
+                        if (editBtn) {
+                            editBtn.addEventListener('click', () => toggleEditProcedure(procedureName));
+                        }
+                        
+                        if (deleteBtn) {
+                            deleteBtn.addEventListener('click', () => deleteProcedure(procedureName));
+                        }
+                        
+                        if (ivaCheckbox) {
+                            ivaCheckbox.addEventListener('change', (e) => {
+                                updateProcedureValue(procedureName, 'removeIVA', e.target.checked);
+                            });
+                        }
+                        
+                        // Si está en modo edición, añadir listeners a los campos de edición
+                        if (state.editingProcedure === procedureName) {
+                            const valueInput = document.getElementById(`edit-value-${procedureName}`);
+                            const percentageInput = document.getElementById(`edit-percentage-${procedureName}`);
+                            
+                            if (valueInput) {
+                                valueInput.addEventListener('input', (e) => {
+                                    updateProcedureValue(procedureName, 'value', e.target.value);
+                                });
+                            }
+                            
+                            if (percentageInput) {
+                                percentageInput.addEventListener('input', (e) => {
+                                    updateProcedureValue(procedureName, 'percentage', e.target.value);
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Renderizar formulario para enfermeros
+            function renderNurseForm() {
+                const nurse = state.selectedDoctor;
+                const data = state.nurseData[nurse] || { days: 0, dailyRate: 0 };
+                
+                return `
+                    <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                        <h3 class="text-lg font-semibold mb-4">Datos de ${nurse}</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Días trabajados:</label>
+                                <input
+                                    id="nurseDays"
+                                    type="number"
+                                    value="${data.days}"
+                                    class="w-full p-2 border border-gray-300 rounded"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Valor por día:</label>
+                                <input
+                                    id="nurseRate"
+                                    type="number"
+                                    value="${data.dailyRate}"
+                                    class="w-full p-2 border border-gray-300 rounded"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Renderizar formulario para doctores
+            function renderDoctorForm() {
+                return `
+                    <!-- Gestión de Procedimientos -->
+                    <div class="mb-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold">Procedimientos de ${state.selectedDoctor}</h2>
+                            <button
+                                id="addProcedureBtn"
+                                class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                            >
+                                <span class="icon plus-icon">
+                                    <svg viewBox="0 0 24 24">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </span>
+                                Agregar Procedimiento
+                            </button>
+                        </div>
+
+                        ${state.showAddForm ? renderAddProcedureForm() : ''}
+
+                        <div class="grid gap-2 max-h-96 overflow-y-auto" id="procedures-container">
+                            ${Object.entries(state.procedureDatabase).map(([procedureName, procedure]) => `
+                                <div class="bg-gray-50 p-3 rounded-lg procedure-item" id="procedure-${procedureName}">
+                                    <div class="grid grid-cols-12 gap-2 items-center">
+                                        <div class="col-span-3">
+                                            <span class="font-medium text-sm">${procedureName}</span>
+                                        </div>
+                                        <div class="col-span-2">
+                                            <input
+                                                id="qty-${procedureName}"
+                                                type="number"
+                                                placeholder="Cantidad"
+                                                value="${state.procedures[state.selectedDoctor]?.[procedureName] || ''}"
+                                                class="w-full p-2 border border-gray-300 rounded text-sm"
+                                            />
+                                        </div>
+                                        <div class="col-span-2">
+                                            ${state.editingProcedure === procedureName ? `
+                                                <input
+                                                    id="edit-value-${procedureName}"
+                                                    type="number"
+                                                    value="${procedure.value}"
+                                                    class="w-full p-2 border border-gray-300 rounded text-sm"
+                                                />
+                                            ` : `
+                                                <span class="text-sm value-display">$${procedure.value.toLocaleString()}</span>
+                                            `}
+                                        </div>
+                                        <div class="col-span-2">
+                                            ${state.editingProcedure === procedureName ? `
+                                                <input
+                                                    id="edit-percentage-${procedureName}"
+                                                    type="number"
+                                                    value="${procedure.percentage}"
+                                                    class="w-full p-2 border border-gray-300 rounded text-sm"
+                                                />
+                                            ` : `
+                                                <span class="text-sm percentage-display">${procedure.percentage}%</span>
+                                            `}
+                                        </div>
+                                        <div class="col-span-1">
+                                            <input
+                                                id="iva-${procedureName}"
+                                                type="checkbox"
+                                                ${procedure.removeIVA ? 'checked' : ''}
+                                                class="rounded"
+                                            />
+                                            <label class="text-xs ml-1">-IVA</label>
+                                        </div>
+                                        <div class="col-span-2 flex gap-1">
+                                            <button
+                                                id="edit-btn-${procedureName}"
+                                                class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded flex items-center"
+                                            >
+                                                ${state.editingProcedure === procedureName ? `
+                                                    <span class="icon save-icon">
+                                                        <svg viewBox="0 极 24 24">
+                                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                                            <polyline points="17 21 17 13 7 13 极 21"></polyline>
+                                                            <polyline points="7 3 7 8 15 8"></polyline>
+                                                        </svg>
+                                                    </span>
+                                                ` : `
+                                                    <span class="icon edit-icon">
+                                                        <svg viewBox="0 0 24 24">
+                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                        </svg>
+                                                    </span>
+                                                `}
+                                            </button>
+                                            <button
+                                                id="delete-btn-${procedureName}"
+                                                class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded flex items-center"
+                                            >
+                                                <span class="icon trash-icon">
+                                                    <svg viewBox="0 0 24 24">
+                                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                    </svg>
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Bonos y Descuentos -->
+                    <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                        <h3 class="text-lg font-semibold mb-4">Bonos y Descuentos</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Bono Hospital:</label>
+                                <input
+                                    id="bonus-hospital"
+                                    type="number"
+                                    value="${state.bonuses.hospital}"
+                                    class="w-full p-2 border border-gray-300 rounded"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Pabellón (se quita IVA):</label>
+                                <input
+                                    id="bonus-pabellon"
+                                    type="number"
+                                    value="${state.bonuses.pabellon}"
+                                    class="w-full p-2 border border-gray-300 rounded"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Bono Producción:</label>
+                                <input
+                                    id="bonus-produccion"
+                                    type="number"
+                                    value="${state.bonuses.produccion}"
+                                    class="w-full p-2 border border-gray-300 rounded"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Insumos y Medicamentos:</label>
+                                <input
+                                    id="bonus-insumosMedicamentos"
+                                    type="number"
+                                    value="${state.bonuses.insumosMedicamentos}"
+                                    class="w-full p-2 border border-gray-300 rounded"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Descuentos Cta. Corriente:</label>
+                                <input
+                                    id="bonus-descuentos"
+                                    type="number"
+                                    value="${state.bonuses.descuentos}"
+                                    class="w-full p-2 border border-gray-300 rounded"
+                                />
+                            </极>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Renderizar formulario para agregar procedimiento
+            function renderAddProcedureForm() {
+                return `
+                    <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                        <h3 class="font-semibold mb-2">Nuevo Procedimiento</h3>
+                        <div class="grid grid-cols-4 gap-2">
+                            <input
+                                type="text"
+                                placeholder="Nombre del procedimiento"
+                                value="${state.newProcedureName}"
+                                id="newProcedureName"
+                                class="p-2 border rounded"
+                            />
+                            <input
+                                type="number"
+                                placeholder="Valor"
+                                value="${state.newProcedureValue}"
+                                id="newProcedureValue"
+                                class="p-2 border rounded"
+                            />
+                            <input
+                                type="number"
+                                placeholder="% Ganancia"
+                                value="${state.newProcedurePercentage}"
+                                id="newProcedurePercentage"
+                                class="p-2 border rounded"
+                            />
+                            <div class="flex gap-2">
+                                <button
+                                    id="saveProcedureBtn"
+                                    class="极 blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded flex items-center gap-1"
+                                >
+                                    <span class="icon save-icon">
+                                        <svg viewBox="0 0 24 24" width="14" height="14">
+                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 极 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                            <polyline points="7 3 7 8 15 8"></polyline>
+                                        </svg>
+                                    </span>
+                                </button>
+                                <button
+                                    id="cancelProcedureBtn"
+                                    class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded flex items-center gap-1"
+                                >
+                                    <span class="icon x-icon">
+                                        <svg viewBox="0 0 24 24" width="14" height="14">
+                                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                                        </svg>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Renderizar área de impresión
+            function renderPrintArea() {
+                const isNurse = state.nurses.includes(state.selectedDoctor);
+                
+                if (isNurse) {
+                    const nurseSalary = calculateNurseSalary(state.selectedDoctor);
+                    return `
+                        <div class="bg-white p-6">
+                            <div class="text-center mb-6">
+                                <h1 class="text-2xl font-bold">LIQUIDACIÓN DE HONORARIOS</h1>
+                                <p class="text-lg mt-2">${state.selectedDoctor}</p>
+                                <p class="text-sm text-gray-600">Período: ${new Date().toLocaleDateString('es-CL')}</极>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div class="border-b pb-2">
+                                    <div class="flex justify-between">
+                                        <span>Días trabajados:</span>
+                                        <span>${state.nurseData[state.selectedDoctor].days}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Valor por día:</span>
+                                        <span>$${state.nurseData[state.selectedDoctor].dailyRate.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                                <div class="极-b pb-2">
+                                    <div class="flex justify-between font-semibold">
+                                        <span>Sueldo Bruto:</span>
+                                        <span>$${nurseSalary.grossSalary.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                                <div class="border-b pb-2">
+                                    <div class="flex justify-between text-red-600">
+                                        <span>Impuesto Boleta (14.5%):</span>
+                                        <span>-$${nurseSalary.tax.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                                <div class="border-t-2 pt-2">
+                                    <div class="flex justify-between text-xl font-bold">
+                                        <span>TOTAL A PAGAR:</span>
+                                        <span>$${nurseSalary.netSalary.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-8 text-center text-sm text-gray-500">
+                                <p>Fecha de emisión: ${new Date().toLocaleDateString('es-CL')}</p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const calculation = calculateTotal();
+                    return `
+                        <div class="bg-white p-6">
+                            <div class="text-center mb-6">
+                                <h1 class="text-2xl font-bold">LIQUIDACIÓN DE HONORARIOS</h1>
+                                <p class="text-lg mt-2">${state.selectedDoctor}</p>
+                                <p class="text-sm text-gray-极">Período: ${new Date().toLocaleDateString('es-CL')}</p>
+                            </div>
+
+                            <!-- Detalle de procedimientos -->
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold mb-3">Detalle de Procedimientos:</h3>
+                                ${Object.entries(state.procedures[state.selectedDoctor] || {}).map(([procedureName, count]) => {
+                                    if (count > 0) {
+                                        const procedure = state.procedureDatabase[procedureName];
+                                        if (procedure) {
+                                            let value = procedure.value;
+                                            if (procedure.removeIVA) {
+                                                value = value / 1.19;
+                                            }
+                                            const earning = (value * procedure.percentage) / 100;
+                                            const total = earning * count;
+                                            
+                                            return `
+                                                <div class="flex justify-between border-b py-1">
+                                                    <span>${procedureName} (${count}x) - ${procedure.percentage}%${procedure.removeIVA ? ' (-IVA)' : ''}</span>
+                                                    <span>$${total.toLocaleString()}</span>
+                                                </div>
+                                            `;
+                                        }
+                                    }
+                                    return '';
+                                }).join('')}
+                            </div>
+
+                            <!-- Resumen por porcentajes -->
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold mb-3">Resumen por Porcentajes:</h3>
+                                ${Object.entries(calculation.byPercentage).map(([percentage, amount]) => `
+                                    <div class="flex justify-between border-b py-1">
+                                        <span>Procedimientos al ${percentage}%:</span>
+                                        <span>$${amount.toLocaleString()}</span>
+                                    </div>
+                                `).join('')}
+                                <div class="flex justify-between font-semibold border-b-2 py-2">
+                                    <span>Subtotal Procedimientos:</span>
+                                    <span>$${calculation.total.toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            <!-- Bonos -->
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold mb-3">Bonos:</h3>
+                                ${state.bonuses.hospital > 0 ? `
+                                    <div class="flex justify-between border-b py-1">
+                                        <span>Bono Hospital:</span>
+                                        <span>$${state.bonuses.hospital.toLocaleString()}</span>
+                                    </div>
+                                ` : ''}
+                                ${state.bonuses.pabellon > 0 ? `
+                                    <div class="flex justify-between border-b py-1">
+                                        <span>Pabellón (10% sin IVA):</span>
+                                        <span>$${calculation.pabellonBonus.toLocaleString()}</span>
+                                    </div>
+                                ` : ''}
+                                ${state.bonuses.produccion > 0 ? `
+                                    <div class="flex justify-between border-b py-1">
+                                        <span>Bono Producción:</span>
+                                        <span>$${state.bonuses.produccion.toLocaleString()}</span>
+                                    </div>
+                                ` : ''}
+                                ${state.bonuses.insumosMedicamentos > 0 ? `
+                                    <div class="flex justify-between border-b py-1">
+                                        <span>Bono Insumos y Medicamentos:</span>
+                                        <span>$${state.bonuses.insumosMedicamentos.toLocaleString()}</span>
+                                    </div>
+                                ` : ''}
+                                ${state.bonuses.descuentos > 0 ? `
+                                    <div class="flex justify-between border-b py-1 text-red-600">
+                                        <span>Descuentos Cuenta Corriente:</span>
+                                        <span>-$${state.bonuses.descuentos.toLocaleString()}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+
+                            <div class="border-t-2 pt-4">
+                                <div class="flex justify-between text-2xl font-bold">
+                                    <span>TOTAL A PAGAR:</span>
+                                    <span>$${calculation.totalWithBonuses.toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            <div class="mt-8 text-center text-sm text-gray-500">
+                                <p>Fecha de emisión: ${new Date().toLocaleDateString('es-CL')}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            // Funciones de manejo de estado
+            function handleDoctorChange(doctor) {
+                state.selectedDoctor = doctor;
+                if (!state.procedures[doctor]) {
+                    state.procedures[doctor] = {};
+                }
+                state.bonuses.insumosMedicamentos = doctor === 'Dra. Toledo' ? 141750 : 0;
+                renderApp();
+            }
+
+            function updateProcedureCount(procedureName, count) {
+                state.procedures[state.selectedDoctor][procedureName] = parseInt(count) || 0;
+                // No rerenderizamos toda la aplicación, solo actualizamos el área de impresión
+                updatePrintArea();
+            }
+
+            function updateProcedureValue(procedureName, field, value) {
+                if (field === 'removeIVA') {
+                    state.procedureDatabase[procedureName][field] = value;
+                } else {
+                    state.procedureDatabase[procedureName][field] = parseFloat(value) || 0;
+                }
+                
+                // Si estamos en modo edición, actualizamos la visualización
+                if (state.editingProcedure === procedureName) {
+                    if (field === 'value') {
+                        const displayElement = document.querySelector(`#procedure-${procedureName} .value-display`);
+                        if (displayElement) {
+                            displayElement.textContent = `$${parseFloat(value).toLocaleString()}`;
+                        }
+                    } else if (field === 'percentage') {
+                        const displayElement = document.querySelector(`#procedure-${procedureName} .percentage-display`);
+                        if (displayElement) {
+                            displayElement.textContent = `${value}%`;
+                        }
+                    }
+                }
+                
+                // Actualizar el área de impresión
+                updatePrintArea();
+            }
+
+            function toggleEditProcedure(procedureName) {
+                if (state.editingProcedure === procedureName) {
+                    // Guardar cambios y salir del modo edición
+                    const valueInput = document.getElementById(`edit-value-${procedureName}`);
+                    const percentageInput = document.getElementById(`edit-percentage-${procedureName}`);
+                    
+                    if (valueInput) {
+                        state.procedureDatabase[procedureName].value = parseFloat(valueInput.value) || 0;
+                    }
+                    if (percentageInput) {
+                        state.procedureDatabase[procedureName].percentage = parseFloat(percentageInput.value) || 0;
+                    }
+                    
+                    state.editingProcedure = null;
+                } else {
+                    state.editingProcedure = procedureName;
+                }
+                
+                // Rerenderizar solo el procedimiento específico
+                updateProcedureItem(procedureName);
+            }
+
+            function updateProcedureItem(procedureName) {
+                const procedureItem = document.getElementById(`procedure-${procedureName}`);
+                if (!procedureItem) return;
+                
+                const procedure = state.procedureDatabase[procedureName];
+                const isEditing = state.editingProcedure === procedureName;
+                
+                // Actualizar solo la parte necesaria del DOM
+                const valueCell = procedureItem.querySelector('.col-span-2:nth-child(3)');
+                const percentageCell = procedureItem.querySelector('.col-span-2:nth-child(4)');
+                const editButton = procedureItem.querySelector(`#edit-btn-${procedureName}`);
+                
+                if (valueCell) {
+                    valueCell.innerHTML = isEditing ? `
+                        <input
+                            id="edit-value-${procedureName}"
+                            type="number"
+                            value="${procedure.value}"
+                            class="w-full p-2 border border-gray-300 rounded text-sm"
+                        />
+                    ` : `
+                        <span class="text-sm value-display">$${procedure.value.toLocaleString()}</span>
+                    `;
+                }
+                
+                if (percentageCell) {
+                    percentageCell.innerHTML = isEditing ? `
+                        <input
+                            id="edit-percentage-${procedureName}"
+                            type="number"
+                            value="${procedure.percentage}"
+                            class="w-full p-2 border border-gray-300 rounded text-sm"
+                        />
+                    ` : `
+                        <span class="text-sm percentage-display">${procedure.percentage}%</span>
+                    `;
+                }
+                
+                if (editButton) {
+                    editButton.innerHTML = isEditing ? `
+                        <span class="icon save-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                <polyline points="7 3 7 8 15 8"></polyline>
+                            </svg>
+                        </span>
+                    ` : `
+                        <span class="icon edit-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 极L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </span>
+                    `;
+                }
+                
+                // Añadir event listeners a los nuevos inputs
+                if (isEditing) {
+                    const valueInput = document.getElementById(`edit-value-${procedureName}`);
+                    const percentageInput = document.getElementById(`edit-percentage-${procedureName}`);
+                    
+                    if (valueInput) {
+                        valueInput.addEventListener('input', (e) => {
+                            updateProcedureValue(procedureName, 'value', e.target.value);
+                        });
+                    }
+                    
+                    if (percentageInput) {
+                        percentageInput.addEventListener('input', (e) => {
+                            updateProcedureValue(procedureName, 'percentage', e.target.value);
+                        });
+                    }
+                }
+                
+                // Actualizar el botón de edición
+                const newEditButton = procedureItem.querySelector(`#edit-btn-${procedureName}`);
+                if (newEditButton) {
+                    newEditButton.addEventListener('click', () => toggleEditProcedure(procedureName));
+                }
+            }
+
+            function deleteProcedure(procedureName) {
+                delete state.procedureDatabase[procedureName];
+                
+                Object.keys(state.procedures).forEach(doctor => {
+                    if (state.procedures[doctor][procedureName]) {
+                        delete state.procedures[doctor][procedureName];
+                    }
+                });
+                
+                renderApp();
+            }
+
+            function addNewProcedure() {
+                const nameInput = document.getElementById('newProcedureName');
+                const valueInput = document.getElementById('newProcedureValue');
+                const percentageInput = document.getElementById('newProcedurePercentage');
+                
+                if (nameInput && valueInput && percentageInput) {
+                    const name = nameInput.value.trim();
+                    const value = parseFloat(valueInput.value);
+                    const percentage = parseFloat(percentageInput.value);
+                    
+                    if (name && !isNaN(value) && !isNaN(percentage)) {
+                        state.procedureDatabase[name] = {
+                            value: value,
+                            percentage: percentage,
+                            removeIVA: false
+                        };
+                        
+                        state.newProcedureName = '';
+                        state.newProcedureValue = '';
+                        state.newProcedurePercentage = '';
+                        state.showAddForm = false;
+                        
+                        renderApp();
+                    }
+                }
+            }
+
+            function updateNurseData(field, value) {
+                state.nurseData[state.selectedDoctor][field] = value;
+                updatePrintArea();
+            }
+
+            function updateBonus(bonusType, value) {
+                state.bonuses[bonusType] = value;
+                updatePrintArea();
+            }
+
+            // Actualizar solo el área de impresión
+            function updatePrintArea() {
+                const printArea = document.querySelector('.print-area');
+                if (printArea) {
+                    printArea.innerHTML = state.selectedDoctor ? renderPrintArea() : '';
+                }
+            }
+
+            // Funciones de cálculo
+            function calculateTotal() {
+                if (!state.selectedDoctor) return { byPercentage: {}, total: 0, totalWithBonuses: 0, pabellonBonus: 0 };
+
+                const doctorProcedures = state.procedures[state.selectedDoctor] || {};
+                const byPercentage = {};
+                let total = 0;
+
+                Object.entries(doctorProcedures).forEach(([procedureName, count]) => {
+                    if (count > 0) {
+                        const procedure = state.procedureDatabase[procedureName];
+                        if (procedure) {
+                            let value = procedure.value;
+                            
+                            // Si hay que quitar IVA, lo hacemos primero
+                            if (procedure.removeIVA) {
+                                value = value / 1.19; // Quitar 19% de IVA
+                            }
+                            
+                            const earning = (value * procedure.percentage) / 100;
+                            const totalEarning = earning * count;
+                            
+                            if (!byPercentage[procedure.percentage]) {
+                                byPercentage[procedure.percentage] = 0;
+                            }
+                            byPercentage[procedure.percentage] += totalEarning;
+                            total += totalEarning;
+                        }
+                    }
+                });
+
+                // Calcular bonos de pabellón (quitar IVA primero)
+                const pabellonWithoutIVA = state.bonuses.pabellon / 1.19;
+                const pabellonBonus = (pabellonWithoutIVA * 10) / 100;
+
+                const totalWithBonuses = total + state.bonuses.hospital + pabellonBonus + state.bonuses.produccion + state.bonuses.insumosMedicamentos - state.bonuses.descuentos;
+
+                return { byPercentage, total, totalWithBonuses, pabellonBonus };
+            }
+
+            function calculateNurseSalary(nurseName) {
+                const nurse = state.nurseData[nurseName];
+                const grossSalary = nurse.days * nurse.dailyRate;
+                const tax = grossSalary * 0.145; // 14.5% impuesto
+                const netSalary = grossSalary - tax;
+                
+                return { grossSalary, tax, netSalary };
+            }
+
+            function handlePrint() {
+                window.print();
+            }
+
+            // Renderizar la aplicación inicial
+            renderApp();
+        });
+    </script>
+</body>
+</html>
